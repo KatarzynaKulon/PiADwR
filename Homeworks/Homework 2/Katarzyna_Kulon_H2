@@ -1,0 +1,74 @@
+gas_dt[, Average_Val := mean(MeasuredValue, na.rn = TRUE), 
+       by =c("Pollutant","Year", "State")]
+library(readr)
+library(stringr)
+library(tidyr)
+library(lubridate)
+library(dplyr)
+library(data.table)
+setwd('/home/datahikerxps/Desktop/progr R')
+
+# Import ----
+gas_files <- list.files("data", full.names = TRUE)
+
+# ZAD 1.
+#gas_two with refference
+
+gas_two_norm_ref <- gas_two[,NormalizedValue := (MeasuredValue-mean(MeasuredValue))/sd(MeasuredValue)]
+
+#gas_two with no refference
+
+NormalizedValue <- gas_two[,.((MeasuredValue-mean(MeasuredValue))/sd(MeasuredValue))]
+
+#lapply,no ref
+gas_two_wide_l <- dcast(gas_two_wide, State + County + City + Site + Date ~ Pollutant,
+                        value.var = "MeasuredValue",
+                        fun.aggregate = function(x) lapply((x-mean(x))/sd(x)))
+#lapply + ref
+gas_two_wide_lr <- dcast(gas_two_wide, State + County + City + Site + Date ~ Pollutant,
+                         fun.aggregate = function(x) lapply(MeasuredValue := (x-mean(x))/sd(x)))
+#no lapply, ref
+gas_two_wide_nlr <- dcast(gas_two_wide, State + County + City + Site + Date ~ Pollutant,
+                          fun.aggregate = function(x) MeasuredValue := (x-mean(x))/sd(x))
+
+#no lapply, no ref
+gas_two_wide_nlnr <- dcast(gas_two_wide, State + County + City + Site + Date ~ Pollutant,
+                           value.var = "MeasuredValue",
+                           fun.aggregate = function(x) (x-mean(x)/sd(x)))
+
+#gas_two_wide lapply
+
+gas_two_wide_2 <- gas_two_wide[,lapply(.SD,normalization(x)), .SDcols = c("CO","Ozone")]
+
+normalization <- function(n){
+  (n-mean(n))/sd(m)
+}
+
+
+#ZAD2.
+
+gas_dt_2 <- gas_dt[State == "Alabama" & Site == "North Birmingham" & County == "Jefferson" & City == "Birmingham",]
+
+gas_dt_wide <- dcast(gas_dt, State + County + City + Site + Pollutant ~ year(Date),
+                          value.var = "MeasuredValue", fill = NA_real_,
+                          fun.aggregate = function(x) mean(x, na.rm = TRUE))
+
+gas_dt_long <- melt(gas_dt_wide_year,
+                         id.vars = setdiff(colnames(gas_dt_wide1), c("2020", "2019")),
+                         measure.vars = c("2020", "2019"),
+                         variable.name = "Date", value.name = "MeasuredValue",
+                         variable.factor = FALSE)
+
+## ZAD.3
+
+gas_dt[, MeanMeasured := mean(MeasuredValue, na.rm = TRUE),
+       by = c("State", "County", "City", "Pollutant")]
+
+gas_dt2 <- gas_dt[,Year := year(Date)]
+
+gas_dt2[,AverageVal :=mean(MeasuredValue,na.rm=TRUE), by=c("Pollutant","State","Year")]
+
+
+
+
+# zad.2
