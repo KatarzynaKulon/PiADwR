@@ -1,0 +1,116 @@
+#funkcje
+if( exists("terrorismLoaded") ) {
+  # if this script already ran, just revert the data object to its original processed form
+  dat <- origDat
+} else {
+  
+
+  terrorismLoaded <- TRUE
+  
+  library(plyr)           # mainly for ddply
+  library(ggplot2)
+  library(RColorBrewer)
+  
+  dat <- read.table("globalterrorismdb_clean.csv", header = TRUE, sep = ',')
+  
+
+  plyrFxCount <- function(x, name="count") {
+    df <- data.frame( nrow(x) )
+    colnames(df)[1] <- name
+    return(df)
+  }
+  plyrFxSum <- function(x, toSum, name="sum") {
+    df <- data.frame( sum(x[toSum]) )
+    colnames(df)[1] <- name
+    return(df)
+  }
+  
+  regionAttackOrder = order(table(dat$region), decreasing=TRUE)
+  regionAttackLevels = names(table(dat$region))[regionAttackOrder]
+  dat$region <- factor(dat$region, levels = regionAttackLevels)
+  
+  regions = levels(dat$region)
+  
+  # create a color palette for the 12 regions. Sequential Brewer palettes only have 9 colours,
+  # so add a few manually (also remove their yellow and gray because they're hard to see)
+  regionCol <- c(brewer.pal(9, name="Set1")[c(-6, -9)], '#EEC900', '#00CED1','#7FFF00','#E9967A', '#2F4F4F')
+  
+  # reorder attack types by total number of attacks per type
+  attackTypeOrder = order(table(dat$attacktype), decreasing=TRUE)
+  attackTypeLevels = names(table(dat$attacktype))[attackTypeOrder]
+  dat$attacktype <- factor(dat$attacktype, levels = attackTypeLevels)
+  
+  # colour palette for attack type, we'll just slice from the region colour palette
+  attacktypeCol <- regionCol[1:length(levels(dat$attacktype))]
+  
+  origDat <- dat
+  resultsDir <- 'results/'
+}
+
+################################
+#############################3
+
+dat <- read.csv("terroryzm.csv",sep=";")
+library(plyr)
+
+# only keep the relevant columns that we are going to use
+columnsKeep <- c("iyear", "imonth", "iday", "country_txt", "region_txt", "city",
+                 "attacktype1_txt", "nkill", "nwound")
+	
+
+dat <- dat[columnsKeep]
+head(dat)
+# rename some columns
+dat <- rename(dat, c("iyear" = "year", "imonth" = "month", "iday" = "day","country_txt" = "country", "region_txt" = "region", "attacktype1_txt" = "attacktype"))
+#revalue
+dat <- within(dat, attacktype <- revalue(attacktype,
+                                         c("Hostage Taking (Kidnapping)" = "Hostage (Kidnapping)",
+                                           "Facility/Infrastructure Attack" = "Facility Attack",
+                                           "Hostage Taking (Barricade Incident)" = "Hostage (Barricade)"
+                                         )))
+dat <- within(dat, region <- revalue(region,
+                                     c("Australasia & Oceania" = "Oceania",
+                                       "Central America & Caribbean" = "Central America",
+                                       "Middle East & North Africa" = "Middle East"
+                                     )))
+
+# replace NA values for number of killed/wounded with 0
+dat$nkill[is.na(dat$nkill)] <- 0
+dat$nwound[is.na(dat$nwound)] <- 0
+
+##### save the processed data frame, which is exactly 10% of the original size
+# note that we omit quotes to save file space, but keep them for cities because some
+# city names contain commas
+write.table(dat, "globalterrorismdb_clean.csv", sep=",", col.names=TRUE, row.names=FALSE,
+            quote=which(colnames(dat) == 'city'))
+
+#######
+####PLOT###PLOT###PLOT###PLOT
+
+## a quick overview of the regions, and see how many attacks happened in each 
+regionTotal <- ddply(dat, ~region, plyrFxCount)
+ggplot(regionTotal, aes(x = region, y = count, fill = region)) +
+  geom_bar(stat="identity", show_guide=FALSE) +
+  coord_flip() +
+  ggtitle("Terrorist Attacks in World Regions Since 1970") +
+  xlab("") +
+  ylab("Number of Attacks") +
+  scale_fill_manual(values = regionCol) +
+  theme(panel.grid.major.y = element_blank(),
+        plot.title = element_text(face="bold"))
+ggsave(paste0(resultsDir, 'terrorismPerRegionTotal.png'))
+dev.off()
+
+# the number of attacks per year in each world region
+ggplot(regionYear, aes(x = year, y = nattacks, color = region)) +
+  geom_line(show_guide=FALSE) +
+  geom_point(show_guide=FALSE) +
+  xlab("Year") + 
+  ggtitle("Ilość ataków terrorystycznych w poszczególnych regionach od roku 1970") + 
+  ylab("Liczba ataków") +
+  facet_wrap(~region) +
+  scale_color_manual(values = regionCol) + 
+  theme(strip.text = element_text(face="bold"),
+        plot.title = element_text(face="bold"))
+ggsave(paste0(resultsDir, 'terrorismPerRegionYears.png'))
+dev.off()
