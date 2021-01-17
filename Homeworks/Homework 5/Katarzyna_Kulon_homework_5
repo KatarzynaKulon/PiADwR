@@ -1,0 +1,51 @@
+#Group liczba grup
+#Y,W,Z wartosci liczbowe
+#zadanie: porównać czas wykonania tej operacji dla tych trzech implementacji,
+microbenchmark <- function(n, Group){
+  ramka_danych <- data.frame(Y = rnorm(n,20), W = rnorm(n, 20), Z = rnorm(n, 20), X = sample(LETTERS[1:Group], n, replace = T))
+  ramka_danych_table <- as.data.table(ramka_danych)
+  #as_tibble_row(c(a = 1, b = 2))
+  #as_tibble_row(list(c = "three", d = list(4:5)))
+  ramka_danych_tibble <- as_tibble(ramka_danych)
+  print("Ramka danych - data frame:")
+  #as_tibble_row(1:3, .name_repair = "unique"
+  print(system.time(aggregate(ramka_danych[,1:3], list(ramka_danych$X), mean)))
+  print("Ramka danych - data table")
+  print(system.time(ramka_danych_table[,.(mean(Y), mean(W), mean(Z)), by = X]))
+  print("Ramka danych - tibble:")
+  print(system.time(ramka_danych_tibble %>% group_by(X) %>% summarise(mean(Y), mean(W), mean(Z))))
+}
+#user / system / elapsed
+microbenchmark(10^6, 20)
+
+#porównanie w ggplotach
+microbenchmarkWykresy <- function(){
+  nowa_ramka <- data.frame(n = 0, typ = "a",group = 0,time = 0)
+  for(N in c(100, 1000, 100000, 100000, 1000000, 10000000)){
+    for(Group in c(2,4, 8, 32, 50)){
+      ramka_danych <- data.frame(Y = sample(1:N,N), W = sample(1:N, N), Z = sample(1:N, N), X = sample(LETTERS[1:Group], N, replace = T))
+      ramka_danych_table <- as.data.table(ramka_danych)
+      #as_tibble_col(ramka_danych)
+      ramka_danych_tibble <- as_tibble(ramka_danych)
+      nowa_ramka <- rbind(nowa_ramka, data.frame(time = system.time(aggregate(ramka_danych[,1:3], list(ramka_danych$X), mean))[3], n = N, group = Group, typ ="base"))
+      #list(c = "three", d = list(4:5)),
+      nowa_ramka <- rbind(nowa_ramka, data.frame(time = system.time(ramka_danych_table[,.(mean(Y), mean(W), mean(Z)), by = X])[3], n = N, group = Group, typ ="data.table"))
+      #nowa_ramka <- cbind(nowa_ramka, data.frame(ramka_danych_tibble %>% group_by(X) %>% summarise(Y,W,Z)), n = N, group = Group, typ ="tidyverse"))
+      nowa_ramka <- rbind(nowa_ramka, data.frame(time = system.time(ramka_danych_tibble %>% group_by(X) %>% summarise(mean(Y), mean(W), mean(Z)))[3], n = N, group = Group, typ ="tidyverse"))
+    }
+  }
+  return(nowa_ramka)}
+nowa_ramka <- microbenchmarkWykresy()[-1,]
+row.names(nowa_ramka) <- NULL
+
+# Narysować wykres zależności czasu (box plot, wartość typowa + zmienność)
+# od N i G według implementacji.
+#GGPLOTS
+#melt(time=replace(razy, (ramka_danych_table[,.(mean(Y), mean(W), mean(Z))][1]), n == N & group == Group))
+ggplot(nowa_ramka %>% filter(group ==2)) + geom_boxplot(aes(x=typ, y=time, col=typ)) + ggtitle("N=2")
+# ggplot(df %>% filter(num_pickups > 10), aes(x=long, y=lat)) +
+#geom_point(color="white", size=0.06)
+ggplot(nowa_ramka %>% filter(group ==4)) + geom_boxplot(aes(x=typ, y=time, col=typ)) + ggtitle("N=4")
+ggplot(nowa_ramka %>% filter(group == 8)) + geom_boxplot(aes(x=typ, y=time, col=typ)) + ggtitle("N=8")
+ggplot(nowa_ramka %>% filter(group == 32)) + geom_boxplot(aes(x=typ, y=time, col=typ)) + ggtitle("N=32")
+ggplot(nowa_ramka %>% filter(group == 50)) + geom_boxplot(aes(x=typ, y=time, col=typ)) + ggtitle("N=50")
